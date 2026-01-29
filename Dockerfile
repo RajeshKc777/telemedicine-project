@@ -12,8 +12,9 @@ COPY . .
 # Create staticfiles directory
 RUN mkdir -p staticfiles
 
-# Expose port
-EXPOSE $PORT
+# Create startup script
+RUN echo '#!/bin/bash\npython manage.py migrate\npython manage.py collectstatic --noinput\npython manage.py runserver 0.0.0.0:${PORT:-8000}' > start.sh
+RUN chmod +x start.sh
 
-# Start the application with migrations
-CMD python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT
+# Start the application
+CMD ["./start.sh"]
