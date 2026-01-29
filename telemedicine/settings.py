@@ -111,11 +111,11 @@ CHANNEL_LAYERS = {
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': 'postgres',
-        'PASSWORD': '301197997Mom@',
-        'HOST': 'db.qcaonoptsqlqopefomhm.supabase.co',
-        'PORT': '5432',
+        'NAME': os.environ.get('DB_NAME', 'postgres'),
+        'USER': os.environ.get('DB_USER', 'postgres'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', '301197997Mom@'),
+        'HOST': os.environ.get('DB_HOST', 'db.qcaonoptsqlqopefomhm.supabase.co'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
         'OPTIONS': {
             'sslmode': 'require',
         },
