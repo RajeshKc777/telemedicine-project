@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Call - {{ user_role|title }}</title>
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.8.1.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background: #000; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: rgba(255,255,255,0.9); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
+        .video-container { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .video-box { flex: 1; background: #333; border-radius: 8px; position: relative; min-height: 250px; min-width: 300px; }
+        .video-label { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 4px; font-size: 14px; }
+        .controls { text-align: center; background: rgba(255,255,255,0.9); padding: 15px; border-radius: 8px; }
+        .btn { padding: 12px 20px; margin: 0 8px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .btn-success { background: #4caf50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-primary { background: #2196f3; color: white; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; text-align: center; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        
+        @media (max-width: 768px) {
+            .video-container { flex-direction: column; }
+            .video-box { min-height: 200px; }
+            .btn { padding: 10px 15px; margin: 5px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Video Consultation</h2>
+            <p><strong>{{ user_name }}</strong> ({{ user_role|title }}) - Room: {{ room_name }}</p>
+        </div>
+
+        <div id="status" class="status info">
+            Click "Join Call" to start the video consultation
+        </div>
+
+        <div class="video-container">
+            <div class="video-box" id="local-video">
+                <div class="video-label">You ({{ user_role|title }})</div>
+            </div>
+            <div class="video-box" id="remote-video">
+                <div class="video-label">
+                    {% if user_role == 'doctor' %}Patient{% elif user_role == 'patient' %}Doctor{% else %}Remote User{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-success" onclick="joinCall()" id="joinBtn">Join Call</button>
+            <button class="btn btn-danger" onclick="leaveCall()" id="leaveBtn" disabled>Leave Call</button>
+            <button class="btn btn-primary" onclick="toggleMic()" id="micBtn" disabled>Mute Mic</button>
+            <button class="btn btn-primary" onclick="toggleCamera()" id="cameraBtn" disabled>Turn Off Camera</button>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="{% url 'direct_call_lobby' %}" style="color: white; text-decoration: none;">← Back to Lobby</a>
+        </div>
+    </div>
+
+    <script>
+        const APP_ID = '{{ app_id }}';
+        const CHANNEL = '{{ room_name }}';
+        const USER_NAME = '{{ user_name }}';
+        const USER_ROLE = '{{ user_role }}';
+        
+        let client = null;
+        let localTracks = [];
+        let remoteUsers = {};
+        let joined = false;
+        let micMuted = false;
+        let cameraMuted = false;
+
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function updateButtons() {
+            document.getElementById('joinBtn').disabled = joined;
+            document.getElementById('leaveBtn').disabled = !joined;
+            document.getElementById('micBtn').disabled = !joined;
+            document.getElementById('cameraBtn').disabled = !joined;
+        }
+
+        async function joinCall() {
+            try {
+                showStatus('Connecting...', 'info');
+                
+                client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+                
+                client.on('user-published', handleUserJoined);
+                client.on('user-left', handleUserLeft);
+
+                const uid = Math.floor(Math.random() * 10000);
+                await client.join(APP_ID, CHANNEL, null, uid);
+
+                localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+                localTracks[1].play('local-video');
+                
+                await client.publish(localTracks);
+                joined = true;
+                updateButtons();
+                
+                showStatus(`Connected as ${USER_ROLE}! Waiting for other participant...`, 'success');
+            } catch (error) {
+                console.error('Join failed:', error);
+                showStatus('Failed to join call: ' + error.message, 'error');
+            }
+        }
+
+        async function leaveCall() {
+            try {
+                if (localTracks.length > 0) {
+                    localTracks.forEach(track => {
+                        track.stop();
+                        track.close();
+                    });
+                    localTracks = [];
+                }
+                
+                if (client) {
+                    await client.leave();
+                }
+                
+                joined = false;
+                micMuted = false;
+                cameraMuted = false;
+                updateButtons();
+                
+                document.getElementById('local-video').innerHTML = '<div class="video-label">You ({{ user_role|title }})</div>';
+                document.getElementById('remote-video').innerHTML = '<div class="video-label">{% if user_role == "doctor" %}Patient{% elif user_role == "patient" %}Doctor{% else %}Remote User{% endif %}</div>';
+                
+                showStatus('Left the call', 'info');
+            } catch (error) {
+                console.error('Leave failed:', error);
+                showStatus('Error leaving call: ' + error.message, 'error');
+            }
+        }
+
+        async function handleUserJoined(user, mediaType) {
+            remoteUsers[user.uid] = user;
+            await client.subscribe(user, mediaType);
+            
+            if (mediaType === 'video') {
+                user.videoTrack.play('remote-video');
+                showStatus('Video call connected! Both participants joined.', 'success');
+            }
+            if (mediaType === 'audio') {
+                user.audioTrack.play();
+            }
+        }
+
+        function handleUserLeft(user) {
+            delete remoteUsers[user.uid];
+            document.getElementById('remote-video').innerHTML = '<div class="video-label">{% if user_role == "doctor" %}Patient{% elif user_role == "patient" %}Doctor{% else %}Remote User{% endif %}</div>';
+            showStatus('Other participant left the call', 'info');
+        }
+
+        async function toggleMic() {
+            if (localTracks[0]) {
+                await localTracks[0].setMuted(!micMuted);
+                micMuted = !micMuted;
+                document.getElementById('micBtn').textContent = micMuted ? 'Unmute Mic' : 'Mute Mic';
+                showStatus(micMuted ? 'Microphone muted' : 'Microphone unmuted', 'info');
+            }
+        }
+
+        async function toggleCamera() {
+            if (localTracks[1]) {
+                await localTracks[1].setMuted(!cameraMuted);
+                cameraMuted = !cameraMuted;
+                document.getElementById('cameraBtn').textContent = cameraMuted ? 'Turn On Camera' : 'Turn Off Camera';
+                showStatus(cameraMuted ? 'Camera turned off' : 'Camera turned on', 'info');
+            }
+        }
+
+        // Auto-cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (joined) {
+                leaveCall();
+            }
+        });
+
+        // Initialize buttons
+        updateButtons();
+    </script>
+</body>
+</html>

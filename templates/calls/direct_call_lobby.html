@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Call Lobby</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; text-align: center; }
+        .header { background: white; padding: 30px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .user-info { background: #e3f2fd; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .btn { padding: 15px 30px; margin: 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #2196f3; color: white; }
+        .btn-success { background: #4caf50; color: white; }
+        .status { padding: 15px; margin: 15px 0; border-radius: 6px; }
+        .status.info { background: #e1f5fe; color: #01579b; }
+        .status.success { background: #e8f5e8; color: #2e7d32; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Video Call Lobby</h1>
+            <p>Direct doctor-patient video consultation</p>
+        </div>
+
+        <div class="user-info">
+            <h3>Welcome, {{ user_name }}</h3>
+            <p><strong>Role:</strong> {{ user_role|title }}</p>
+            <p><strong>Room:</strong> {{ room_name }}</p>
+        </div>
+
+        <div class="status info">
+            {% if user_role == 'doctor' %}
+                <strong>Doctor Instructions:</strong><br>
+                • Click "Join Video Call" to enter the consultation room<br>
+                • Patients will automatically connect to the same room<br>
+                • You can start the call immediately
+            {% elif user_role == 'patient' %}
+                <strong>Patient Instructions:</strong><br>
+                • Click "Join Video Call" to meet with your doctor<br>
+                • Your doctor will be in the same room<br>
+                • Allow camera and microphone access when prompted
+            {% else %}
+                <strong>Instructions:</strong><br>
+                • Click "Join Video Call" to start<br>
+                • Share this room with others to connect
+            {% endif %}
+        </div>
+
+        <div style="margin: 30px 0;">
+            <a href="{% url 'auto_video_call' %}" class="btn btn-success">
+                🎥 Join Video Call
+            </a>
+            
+            {% if user_role == 'doctor' %}
+                <a href="/doctor-dashboard/" class="btn btn-primary">
+                    ← Back to Dashboard
+                </a>
+            {% elif user_role == 'patient' %}
+                <a href="/patient-dashboard/" class="btn btn-primary">
+                    ← Back to Dashboard
+                </a>
+            {% endif %}
+        </div>
+
+        <div class="status info">
+            <p><strong>How it works:</strong></p>
+            <p>1. Both doctor and patient click "Join Video Call"</p>
+            <p>2. You'll automatically connect in the same room</p>
+            <p>3. No tokens or complex setup needed!</p>
+        </div>
+    </div>
+</body>
+</html>

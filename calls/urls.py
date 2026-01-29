@@ -2,6 +2,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Direct video calling (no tokens)
+    path('lobby/', views.direct_call_lobby, name='direct_call_lobby'),
+    path('auto-call/', views.auto_video_call, name='auto_video_call'),
+    path('test-call/', views.simple_test_call, name='simple_test_call'),
+    
     # Token-based video calling
     path('enter-token/', views.enter_token, name='enter_token'),
     path('lobby/<str:token>/', views.waiting_lobby, name='waiting_lobby'),

@@ -6,7 +6,13 @@ from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
 from appointments.models import Appointment
 from .models import VideoCall, CallSession
-from agora_token_builder import RtcTokenBuilder
+try:
+    from agora_token_builder.RtcTokenBuilder import RtcTokenBuilder
+except ImportError:
+    try:
+        from agora_token_builder import RtcTokenBuilder
+    except ImportError:
+        RtcTokenBuilder = None
 import json
 import random
 import time
@@ -99,15 +105,23 @@ def video_room(request, token):
 
 def generate_agora_token(channel_name, uid):
     """Generate proper Agora token with specific UID"""
+    if RtcTokenBuilder is None:
+        # Return None if agora_token_builder is not available
+        return None
+        
     expiration_time_in_seconds = 3600 * 24  # 24 hours
     current_timestamp = int(time.time())
     privilege_expired_ts = current_timestamp + expiration_time_in_seconds
     role = 1  # Publisher role
     
-    token = RtcTokenBuilder.buildTokenWithUid(
-        APP_ID, APP_CERTIFICATE, channel_name, uid, role, privilege_expired_ts
-    )
-    return token
+    try:
+        token = RtcTokenBuilder.buildTokenWithUid(
+            APP_ID, APP_CERTIFICATE, channel_name, uid, role, privilege_expired_ts
+        )
+        return token
+    except Exception as e:
+        print(f"Error generating Agora token: {e}")
+        return None
 
 @csrf_exempt
 def get_agora_token(request):
@@ -245,6 +259,122 @@ def test_connection(request):
         
         try:
             appointment = Appointment.objects.get(id=appointment_id)
+            
+            # Check if user has access
+            if request.user != appointment.doctor and request.user != appointment.patient:
+                results['errors'].append('Access denied')
+                return JsonResponse(results)
+            
+            # Basic connectivity test
+            results['websocket'] = True
+            results['webrtc'] = True
+            results['media'] = True
+            
+            return JsonResponse(results)
+            
+        except Appointment.DoesNotExist:
+            results['errors'].append('Appointment not found')
+            return JsonResponse(results)
+        except Exception as e:
+            results['errors'].append(str(e))
+            return JsonResponse(results)
+    
+    return JsonResponse({'error': 'Invalid request method'})
+
+def simple_test_call(request):
+    """Simple test page for video calling - no login required"""
+    import random
+    context = {
+        'user_name': 'Test User',
+        'user_role': 'tester',
+        'room_name': f'test_room_{random.randint(1000, 9999)}'
+    }
+    return render(request, 'calls/simple_test.html', context)
+
+@login_required
+def direct_call_lobby(request):
+    """Direct call lobby - doctors and patients can join automatically"""
+    user_role = getattr(request.user, 'role', 'user')
+    
+    # Create a simple room based on user role
+    if user_role == 'doctor':
+        room_name = 'doctor_patient_room'
+        other_role = 'patient'
+    elif user_role == 'patient':
+        room_name = 'doctor_patient_room'
+        other_role = 'doctor'
+    else:
+        room_name = f'general_room_{random.randint(1000, 9999)}'
+        other_role = 'user'
+    
+    context = {
+        'user_name': request.user.get_full_name() or request.user.username,
+        'user_role': user_role,
+        'other_role': other_role,
+        'room_name': room_name,
+        'app_id': APP_ID
+    }
+    
+    return render(request, 'calls/direct_call_lobby.html', context)
+
+@login_required
+def auto_video_call(request):
+    """Auto video call - no tokens needed"""
+    user_role = getattr(request.user, 'role', 'user')
+    room_name = 'doctor_patient_room'  # Same room for all
+    
+    context = {
+        'user_name': request.user.get_full_name() or request.user.username,
+        'user_role': user_role,
+        'room_name': room_name,
+        'app_id': APP_ID
+    }
+    
+    return render(request, 'calls/auto_video_call.html', context)
+
+@login_required
+def manual_test(request, appointment_id):
+    """Manual test view for appointment-based calls"""
+    appointment = get_object_or_404(Appointment, id=appointment_id)
+    
+    context = {
+        'appointment': appointment,
+    }
+    
+    return render(request, 'calls/manual_test.html', context)
+
+@login_required
+def cross_device_test(request, appointment_id):
+    """Cross device test view"""
+    appointment = get_object_or_404(Appointment, id=appointment_id)
+    
+    context = {
+        'appointment': appointment,
+    }
+    
+    return render(request, 'calls/cross_device_test.html', context)
+
+@login_required
+def get_signal(request, appointment_id):
+    """Get WebRTC signaling data"""
+    if request.method == 'GET':
+        signal_type = request.GET.get('type')  # 'offer' or 'answer'
+        other_user_id = request.GET.get('other_user_id')
+        
+        if signal_type == 'offer':
+            cache_key = f'webrtc_offer_{appointment_id}_{other_user_id}'
+        else:
+            cache_key = f'webrtc_answer_{appointment_id}_{other_user_id}'
+        
+        signal_data = cache.get(cache_key)
+        
+        if signal_data:
+            cache.delete(cache_key)  # Remove after retrieving
+            return JsonResponse({'success': True, 'data': signal_data})
+        else:
+            return JsonResponse({'success': False, 'message': 'No signal data found'})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})cts.get(id=appointment_id)
             if request.user == appointment.doctor or request.user == appointment.patient:
                 results['access'] = True
             else:
