@@ -9,12 +9,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Collect static files and migrate
-RUN python manage.py collectstatic --noinput
-RUN python manage.py migrate
+# Create staticfiles directory
+RUN mkdir -p staticfiles
 
 # Expose port
 EXPOSE $PORT
 
-# Start the application
-CMD python manage.py runserver 0.0.0.0:$PORT
+# Start the application with migrations
+CMD python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:$PORT
