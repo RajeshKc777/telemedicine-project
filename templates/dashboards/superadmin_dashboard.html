@@ -102,14 +102,14 @@
                     class="text-sm text-medical-blue hover:text-medical-blue-dark font-medium">+ Add</a>
             </div>
             <div class="space-y-3">
-                <a href="{% url 'manage_hospitals' %}"
+                <a href="/admin/hospitals/hospital/"
                     class="w-full flex items-center justify-between p-3 bg-medical-bg hover:bg-gray-100 rounded-lg transition-colors">
                     <span class="text-sm font-medium text-gray-900">View All Hospitals</span>
                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                     </svg>
                 </a>
-                <a href="{% url 'assign_hospital_admins' %}"
+                <a href="/admin/users/user/?role__exact=admin"
                     class="w-full flex items-center justify-between p-3 bg-medical-bg hover:bg-gray-100 rounded-lg transition-colors">
                     <span class="text-sm font-medium text-gray-900">Assign Admins</span>
                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -134,7 +134,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                     </svg>
                 </a>
-                <a href="{% url 'assign_roles' %}"
+                <a href="/admin/users/user/"
                     class="w-full flex items-center justify-between p-3 bg-medical-bg hover:bg-gray-100 rounded-lg transition-colors">
                     <span class="text-sm font-medium text-gray-900">Role Assignments</span>
                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
