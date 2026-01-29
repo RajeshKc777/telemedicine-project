@@ -79,4 +79,3 @@ Telemedicine-Project/
 .dockerignore
 compose.yaml
 defang.yaml
-Dockerfile
