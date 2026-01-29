@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Telemedicine System{% endblock %}</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Custom Tailwind Configuration -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'medical-blue': '#0066CC',
+            'medical-blue-dark': '#004C99',
+            'medical-green': '#00A86B',
+            'medical-bg': '#F8FAFC',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Custom Styles -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+
+    .medical-gradient {
+      background: linear-gradient(135deg, #0066CC 0%, #004C99 100%);
+    }
+
+    .medical-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .btn-medical {
+      background: #0066CC;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .btn-medical:hover {
+      background: #004C99;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+    }
+
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-scheduled {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+
+    .status-completed {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .status-cancelled {
+      background-color: #fee2e2;
+      color: #dc2626;
+    }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+
+<body class="min-h-screen bg-medical-bg">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <!-- Logo and Brand -->
+        <div class="flex items-center space-x-3">
+          <div class="medical-gradient w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z">
+              </path>
+            </svg>
+          </div>
+          <div class="hidden sm:block">
+            <h1 class="text-lg sm:text-xl font-bold text-gray-900">Telemedicine</h1>
+            <p class="text-xs text-gray-500">Healthcare System</p>
+          </div>
+          <div class="sm:hidden">
+            <h1 class="text-lg font-bold text-gray-900">TeleMed</h1>
+          </div>
+        </div>
+
+        <!-- Mobile Menu Button -->
+        <div class="sm:hidden">
+          <button id="mobile-menu-button" class="text-gray-600 hover:text-gray-900 focus:outline-none">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Desktop Navigation -->
+        <nav class="hidden sm:flex items-center space-x-4 lg:space-x-6">
+          {% if user.is_authenticated %}
+          <div class="flex items-center space-x-2 lg:space-x-4">
+            {% if user.role in 'doctor,patient' %}
+            <a href="{% url 'chat_list' %}" class="flex items-center space-x-1 lg:space-x-2 bg-medical-blue text-white px-2 lg:px-4 py-2 rounded-lg hover:bg-medical-blue-dark transition-colors text-sm">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.955 8.955 0 01-4.126-.98L3 20l1.98-5.874A8.955 8.955 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z"></path>
+              </svg>
+              <span class="hidden lg:inline">Chat</span>
+            </a>
+            {% endif %}
+            <div class="text-xs lg:text-sm">
+              <span class="text-gray-700 hidden lg:inline">Welcome,</span>
+              <span class="font-semibold text-gray-900">{{ user.first_name|default:user.username }}</span>
+              {% if user.role %}
+              <span class="ml-1 lg:ml-2 px-1 lg:px-2 py-1 text-xs font-medium rounded-full bg-medical-blue text-white">
+                {{ user.get_role_display }}
+              </span>
+              {% endif %}
+            </div>
+            <form id="logout-form" action="{% url 'logout' %}" method="post" class="hidden">
+              {% csrf_token %}
+            </form>
+            <a href="javascript:void(0)" onclick="document.getElementById('logout-form').submit();"
+              class="text-sm text-gray-600 hover:text-medical-blue transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+              </svg>
+            </a>
+          </div>
+          {% endif %}
+        </nav>
+      </div>
+
+      <!-- Mobile Navigation Menu -->
+      <div id="mobile-menu" class="sm:hidden hidden border-t border-gray-200 pt-4 pb-4">
+        {% if user.is_authenticated %}
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-sm font-semibold text-gray-900">{{ user.first_name|default:user.username }}</span>
+              {% if user.role %}
+              <span class="ml-2 px-2 py-1 text-xs font-medium rounded-full bg-medical-blue text-white">
+                {{ user.get_role_display }}
+              </span>
+              {% endif %}
+            </div>
+          </div>
+          {% if user.role in 'doctor,patient' %}
+          <a href="{% url 'chat_list' %}" class="flex items-center space-x-2 bg-medical-blue text-white px-4 py-2 rounded-lg hover:bg-medical-blue-dark transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.955 8.955 0 01-4.126-.98L3 20l1.98-5.874A8.955 8.955 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z"></path>
+            </svg>
+            <span>Chat</span>
+          </a>
+          {% endif %}
+          <a href="javascript:void(0)" onclick="document.getElementById('logout-form').submit();"
+            class="flex items-center space-x-2 text-gray-600 hover:text-medical-blue transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            </svg>
+            <span>Logout</span>
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-gray-200 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+      <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+        <div class="text-xs sm:text-sm text-gray-600 text-center md:text-left">
+          <p>&copy; 2026 Telemedicine System. All rights reserved.</p>
+        </div>
+        <div class="flex items-center space-x-4 sm:space-x-6 text-xs sm:text-sm text-gray-600">
+          <a href="#" class="hover:text-medical-blue transition-colors">Privacy</a>
+          <a href="#" class="hover:text-medical-blue transition-colors">Terms</a>
+          <a href="#" class="hover:text-medical-blue transition-colors">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Mobile Menu Script -->
+  <script>
+    document.getElementById('mobile-menu-button')?.addEventListener('click', function() {
+      const mobileMenu = document.getElementById('mobile-menu');
+      mobileMenu.classList.toggle('hidden');
+    });
+  </script>
+
+  {% block extra_scripts %}{% endblock %}
+</body>
+
+</html>

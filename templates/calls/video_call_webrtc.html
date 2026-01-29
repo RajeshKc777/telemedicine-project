@@ -1,0 +1,382 @@
+{% extends 'base.html' %}
+
+{% block title %}Video Call - {{ other_user.get_full_name|default:other_user.username }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <!-- Call Header -->
+    <div class="medical-card p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-medical-blue rounded-full flex items-center justify-center text-white font-bold">
+                    {{ other_user.first_name.0|default:other_user.username.0|upper }}
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900">
+                        Video Call with {% if user_role == 'patient' %}Dr. {% endif %}{{ other_user.get_full_name|default:other_user.username }}
+                    </h1>
+                    <p class="text-sm text-gray-600">
+                        Appointment: {{ appointment.date }} at {{ appointment.time|time:"g:i A" }}
+                    </p>
+                </div>
+            </div>
+            <div class="flex space-x-2">
+                <button id="end-call-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors">
+                    📞 End Call
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Call Interface -->
+    <div class="medical-card p-0 overflow-hidden">
+        <div class="relative bg-gray-900 h-96">
+            <!-- Remote Video (Other Person) -->
+            <video id="remote-video" class="w-full h-full object-cover" autoplay playsinline></video>
+            
+            <!-- Local Video (Self) - Picture in Picture -->
+            <div class="absolute top-4 right-4 w-48 h-36 bg-gray-800 rounded-lg overflow-hidden border-2 border-white">
+                <video id="local-video" class="w-full h-full object-cover" autoplay playsinline muted></video>
+            </div>
+            
+            <!-- Call Status -->
+            <div id="call-status" class="absolute top-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-lg">
+                Connecting...
+            </div>
+        </div>
+        
+        <!-- Call Controls -->
+        <div class="p-4 bg-gray-100 flex justify-center space-x-4">
+            <button id="toggle-video" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                📹 Video On
+            </button>
+            <button id="toggle-audio" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors">
+                🎤 Mic On
+            </button>
+            <button id="start-call" class="bg-medical-blue text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                📞 Start Call
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const appointmentId = {{ appointment.id }};
+    const currentUserId = {{ user.id }};
+    
+    let localStream = null;
+    let peerConnection = null;
+    let isVideoEnabled = true;
+    let isAudioEnabled = true;
+    let callSocket = null;
+    
+    const localVideo = document.getElementById('local-video');
+    const remoteVideo = document.getElementById('remote-video');
+    const callStatus = document.getElementById('call-status');
+    
+    // WebRTC Configuration (Industry Standard)
+    const configuration = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' }
+        ]
+    };
+    
+    // Initialize WebSocket for signaling (Industry Standard)
+    function initializeWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        callSocket = new WebSocket(`${protocol}//${window.location.host}/ws/call/${appointmentId}/`);
+        
+        callSocket.onopen = function(e) {
+            console.log('WebSocket connected for signaling');
+            callStatus.textContent = 'Ready to call';
+        };
+        
+        callSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            handleSignalingMessage(data);
+        };
+        
+        callSocket.onclose = function(e) {
+            console.log('WebSocket disconnected, code:', e.code);
+            if (e.code !== 1000) { // Not a normal closure
+                callStatus.textContent = 'Connection lost - reconnecting...';
+                // Attempt to reconnect after 2 seconds
+                setTimeout(() => {
+                    if (!callSocket || callSocket.readyState === WebSocket.CLOSED) {
+                        initializeWebSocket();
+                    }
+                }, 2000);
+            } else {
+                callStatus.textContent = 'Call ended';
+            }
+        };
+        
+        callSocket.onerror = function(e) {
+            console.error('WebSocket error:', e);
+            callStatus.textContent = 'Connection error - retrying...';
+        };
+    }
+    
+    // Handle WebSocket signaling messages
+    async function handleSignalingMessage(data) {
+        try {
+            switch(data.type) {
+                case 'user_joined':
+                    callStatus.textContent = `${data.username} joined`;
+                    break;
+                    
+                case 'user_left':
+                    callStatus.textContent = `${data.username} left`;
+                    if (peerConnection) {
+                        peerConnection.close();
+                    }
+                    break;
+                    
+                case 'offer':
+                    await handleOffer(data.offer);
+                    break;
+                    
+                case 'answer':
+                    await handleAnswer(data.answer);
+                    break;
+                    
+                case 'ice_candidate':
+                    await handleIceCandidate(data.candidate);
+                    break;
+            }
+        } catch (error) {
+            console.error('Error handling signaling message:', error);
+        }
+    }
+    
+    // Initialize media devices
+    async function initializeMedia() {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 1280, height: 720 },
+                audio: { echoCancellation: true, noiseSuppression: true }
+            });
+            localVideo.srcObject = localStream;
+            
+            // Enable start call button
+            document.getElementById('start-call').disabled = false;
+            
+        } catch (error) {
+            console.error('Error accessing media devices:', error);
+            callStatus.textContent = 'Camera/Microphone access denied';
+            alert('Please allow camera and microphone access to make video calls.');
+        }
+    }
+    
+    // Create WebRTC peer connection (Industry Standard)
+    function createPeerConnection() {
+        peerConnection = new RTCPeerConnection(configuration);
+        
+        // Add local stream tracks
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+        }
+        
+        // Handle remote stream
+        peerConnection.ontrack = (event) => {
+            console.log('Received remote stream');
+            remoteVideo.srcObject = event.streams[0];
+            callStatus.textContent = 'Connected';
+        };
+        
+        // Handle ICE candidates
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate && callSocket.readyState === WebSocket.OPEN) {
+                callSocket.send(JSON.stringify({
+                    type: 'ice_candidate',
+                    candidate: event.candidate
+                }));
+            }
+        };
+        
+        // Connection state monitoring
+        peerConnection.onconnectionstatechange = () => {
+            console.log('Connection state:', peerConnection.connectionState);
+            callStatus.textContent = `Connection: ${peerConnection.connectionState}`;
+        };
+        
+        peerConnection.oniceconnectionstatechange = () => {
+            console.log('ICE connection state:', peerConnection.iceConnectionState);
+        };
+    }
+    
+    // Start call (Caller)
+    async function startCall() {
+        // Wait for WebSocket connection if not ready
+        if (!callSocket || callSocket.readyState !== WebSocket.OPEN) {
+            callStatus.textContent = 'Connecting...';
+            // Wait up to 5 seconds for connection
+            let attempts = 0;
+            while ((!callSocket || callSocket.readyState !== WebSocket.OPEN) && attempts < 10) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                attempts++;
+            }
+            
+            if (!callSocket || callSocket.readyState !== WebSocket.OPEN) {
+                alert('Unable to establish connection. Please refresh and try again.');
+                return;
+            }
+        }
+        
+        createPeerConnection();
+        callStatus.textContent = 'Creating offer...';
+        
+        try {
+            const offer = await peerConnection.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true
+            });
+            
+            await peerConnection.setLocalDescription(offer);
+            
+            // Send offer via WebSocket
+            callSocket.send(JSON.stringify({
+                type: 'offer',
+                offer: offer
+            }));
+            
+            callStatus.textContent = 'Calling...';
+            
+        } catch (error) {
+            console.error('Error starting call:', error);
+            callStatus.textContent = 'Call failed';
+        }
+    }
+    
+    // Handle incoming offer (Callee)
+    async function handleOffer(offer) {
+        createPeerConnection();
+        callStatus.textContent = 'Incoming call...';
+        
+        try {
+            await peerConnection.setRemoteDescription(offer);
+            
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            
+            // Send answer via WebSocket
+            callSocket.send(JSON.stringify({
+                type: 'answer',
+                answer: answer
+            }));
+            
+            callStatus.textContent = 'Answering call...';
+            
+        } catch (error) {
+            console.error('Error handling offer:', error);
+        }
+    }
+    
+    // Handle incoming answer (Caller)
+    async function handleAnswer(answer) {
+        try {
+            await peerConnection.setRemoteDescription(answer);
+            callStatus.textContent = 'Call established';
+        } catch (error) {
+            console.error('Error handling answer:', error);
+        }
+    }
+    
+    // Handle ICE candidates
+    async function handleIceCandidate(candidate) {
+        try {
+            await peerConnection.addIceCandidate(candidate);
+        } catch (error) {
+            console.error('Error adding ICE candidate:', error);
+        }
+    }
+    
+    // Toggle video
+    function toggleVideo() {
+        if (localStream) {
+            const videoTrack = localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                isVideoEnabled = videoTrack.enabled;
+                document.getElementById('toggle-video').textContent = 
+                    isVideoEnabled ? '📹 Video On' : '📹 Video Off';
+            }
+        }
+    }
+    
+    // Toggle audio
+    function toggleAudio() {
+        if (localStream) {
+            const audioTrack = localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                isAudioEnabled = audioTrack.enabled;
+                document.getElementById('toggle-audio').textContent = 
+                    isAudioEnabled ? '🎤 Mic On' : '🎤 Mic Off';
+            }
+        }
+    }
+    
+    // End call
+    function endCall() {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+        if (peerConnection) {
+            peerConnection.close();
+        }
+        if (callSocket) {
+            callSocket.close();
+        }
+        
+        callStatus.textContent = 'Call ended';
+        
+        // Redirect back to chat
+        setTimeout(() => {
+            window.location.href = `/chat/${appointmentId}/`;
+        }, 2000);
+    }
+    
+    // Event listeners
+    document.getElementById('start-call').addEventListener('click', startCall);
+    document.getElementById('toggle-video').addEventListener('click', toggleVideo);
+    document.getElementById('toggle-audio').addEventListener('click', toggleAudio);
+    document.getElementById('end-call-btn').addEventListener('click', endCall);
+    
+    // Initialize everything
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize WebSocket with retry
+        initializeWebSocket();
+        
+        // Initialize media
+        initializeMedia();
+        
+        // Initially disable start call button
+        document.getElementById('start-call').disabled = true;
+        
+        // Auto-start call if both users are present (simulate incoming call)
+        setTimeout(() => {
+            if (callSocket && callSocket.readyState === WebSocket.OPEN) {
+                callStatus.textContent = 'Ready - Click Start Call';
+            }
+        }, 2000);
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+        if (peerConnection) {
+            peerConnection.close();
+        }
+        if (callSocket) {
+            callSocket.close();
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,340 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Video Call{% endblock %}
+
+{% block extra_css %}
+<style>
+    .video-container {
+        position: relative;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 10px;
+        width: 100%;
+    }
+    
+    .video-player {
+        width: 100%;
+        height: 200px;
+        background: #000;
+    }
+    
+    @media (min-width: 640px) {
+        .video-player {
+            height: 300px;
+        }
+    }
+    
+    .username-wrapper {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    
+    @media (min-width: 640px) {
+        .username-wrapper {
+            font-size: 14px;
+        }
+    }
+    
+    .controls-wrapper {
+        text-align: center;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    @media (min-width: 640px) {
+        .controls-wrapper {
+            position: static;
+            transform: none;
+            padding: 20px;
+        }
+    }
+    
+    .control-icon {
+        width: 40px;
+        height: 40px;
+        margin: 0 8px;
+        padding: 8px;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid #ddd;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    @media (min-width: 640px) {
+        .control-icon {
+            width: 50px;
+            height: 50px;
+            margin: 0 10px;
+            padding: 10px;
+        }
+    }
+    
+    .control-icon:hover {
+        background: #f0f0f0;
+    }
+    
+    .control-icon.active {
+        background: #dc3545;
+        border-color: #dc3545;
+        color: white;
+    }
+    
+    #video-streams {
+        min-height: 300px;
+        padding-bottom: 100px;
+    }
+    
+    @media (min-width: 640px) {
+        #video-streams {
+            min-height: 400px;
+            padding-bottom: 0;
+        }
+    }
+    
+    .call-info {
+        background: #e9ecef;
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    
+    @media (min-width: 640px) {
+        .call-info {
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3 px-2 sm:px-4">
+    <div class="call-info">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
+            <div>
+                <h5 class="text-sm sm:text-base font-semibold">Video Call - Token: {{ appointment.call_token }}</h5>
+                <p class="mb-0 text-xs sm:text-sm"><strong>{{ appointment.doctor.get_full_name|default:appointment.doctor.username }}</strong> & <strong>{{ appointment.patient.get_full_name|default:appointment.patient.username }}</strong></p>
+            </div>
+            <div>
+                <span id="call-duration" class="inline-block px-2 py-1 bg-medical-blue text-white rounded text-xs sm:text-sm font-medium">00:00</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="w-full">
+        <div id="video-streams" class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+            <!-- Video streams will be added here dynamically -->
+        </div>
+    </div>
+    
+    <div class="controls-wrapper">
+        <button id="mic-btn" class="control-icon" title="Toggle Microphone">
+            <i class="fas fa-microphone text-sm sm:text-base"></i>
+        </button>
+        <button id="camera-btn" class="control-icon" title="Toggle Camera">
+            <i class="fas fa-video text-sm sm:text-base"></i>
+        </button>
+        <button id="leave-btn" class="control-icon" title="Leave Call" style="background: #dc3545; color: white;">
+            <i class="fas fa-phone-slash text-sm sm:text-base"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Agora SDK -->
+<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.8.1.js"></script>
+
+<script>
+// Agora configuration
+const APP_ID = '{{ app_id }}';
+const CHANNEL = '{{ channel_name }}';
+const TOKEN = '{{ token }}';
+let UID = Math.floor(Math.random() * 10000);
+
+const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+let localTracks = [];
+let remoteUsers = {};
+
+// Call duration tracking
+let callStartTime = Date.now();
+let durationInterval;
+
+// User info
+const USER_NAME = '{{ user.get_full_name|default:user.username }}';
+const USER_ROLE = '{{ user_role }}';
+
+async function joinAndDisplayLocalStream() {
+    try {
+        // Join the channel
+        await client.join(APP_ID, CHANNEL, TOKEN, UID);
+        
+        // Create local tracks
+        localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+        
+        // Display local video
+        const localPlayer = `
+            <div class="w-full">
+                <div class="video-container" id="user-container-${UID}">
+                    <div class="username-wrapper">
+                        <span class="user-name">${USER_NAME} (You)</span>
+                    </div>
+                    <div class="video-player" id="user-${UID}"></div>
+                </div>
+            </div>
+        `;
+        document.getElementById('video-streams').insertAdjacentHTML('beforeend', localPlayer);
+        
+        // Play local video
+        localTracks[1].play(`user-${UID}`);
+        
+        // Publish local tracks
+        await client.publish([localTracks[0], localTracks[1]]);
+        
+        // Start call duration timer
+        startDurationTimer();
+        
+        console.log('Successfully joined and published local stream');
+        
+    } catch (error) {
+        console.error('Error joining channel:', error);
+        alert('Failed to join video call. Please try again.');
+        window.location.href = "{% url 'waiting_lobby' appointment.call_token %}";
+    }
+}
+
+// Handle remote user joining
+client.on('user-published', async (user, mediaType) => {
+    remoteUsers[user.uid] = user;
+    await client.subscribe(user, mediaType);
+    
+    if (mediaType === 'video') {
+        // Remove existing player if any
+        const existingPlayer = document.getElementById(`user-container-${user.uid}`);
+        if (existingPlayer) {
+            existingPlayer.remove();
+        }
+        
+        // Create remote video player
+        const remotePlayer = `
+            <div class="w-full">
+                <div class="video-container" id="user-container-${user.uid}">
+                    <div class="username-wrapper">
+                        <span class="user-name">{{ other_user.get_full_name|default:other_user.username }}</span>
+                    </div>
+                    <div class="video-player" id="user-${user.uid}"></div>
+                </div>
+            </div>
+        `;
+        document.getElementById('video-streams').insertAdjacentHTML('beforeend', remotePlayer);
+        
+        // Play remote video
+        user.videoTrack.play(`user-${user.uid}`);
+    }
+    
+    if (mediaType === 'audio') {
+        user.audioTrack.play();
+    }
+});
+
+// Handle remote user leaving
+client.on('user-left', (user) => {
+    delete remoteUsers[user.uid];
+    const playerContainer = document.getElementById(`user-container-${user.uid}`);
+    if (playerContainer) {
+        playerContainer.remove();
+    }
+});
+
+// Control functions
+async function toggleMicrophone() {
+    const micBtn = document.getElementById('mic-btn');
+    if (localTracks[0].muted) {
+        await localTracks[0].setMuted(false);
+        micBtn.classList.remove('active');
+        micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+    } else {
+        await localTracks[0].setMuted(true);
+        micBtn.classList.add('active');
+        micBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+    }
+}
+
+async function toggleCamera() {
+    const cameraBtn = document.getElementById('camera-btn');
+    if (localTracks[1].muted) {
+        await localTracks[1].setMuted(false);
+        cameraBtn.classList.remove('active');
+        cameraBtn.innerHTML = '<i class="fas fa-video"></i>';
+    } else {
+        await localTracks[1].setMuted(true);
+        cameraBtn.classList.add('active');
+        cameraBtn.innerHTML = '<i class="fas fa-video-slash"></i>';
+    }
+}
+
+async function leaveCall() {
+    // Stop local tracks
+    for (let track of localTracks) {
+        track.stop();
+        track.close();
+    }
+    
+    // Leave the channel
+    await client.leave();
+    
+    // Stop duration timer
+    if (durationInterval) {
+        clearInterval(durationInterval);
+    }
+    
+    // Redirect back to dashboard
+    window.location.href = "{% url 'dashboard_redirect' %}";
+}
+
+function startDurationTimer() {
+    durationInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById('call-duration').textContent = 
+            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }, 1000);
+}
+
+// Event listeners
+document.getElementById('mic-btn').addEventListener('click', toggleMicrophone);
+document.getElementById('camera-btn').addEventListener('click', toggleCamera);
+document.getElementById('leave-btn').addEventListener('click', leaveCall);
+
+// Handle page unload
+window.addEventListener('beforeunload', () => {
+    if (localTracks.length > 0) {
+        for (let track of localTracks) {
+            track.stop();
+            track.close();
+        }
+    }
+});
+
+// Initialize the call
+joinAndDisplayLocalStream();
+</script>
+{% endblock %}

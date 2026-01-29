@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+
+{% block title %}Video Call - {{ other_user.get_full_name|default:other_user.username }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <!-- Call Header -->
+    <div class="medical-card p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-medical-blue rounded-full flex items-center justify-center text-white font-bold">
+                    {{ other_user.first_name.0|default:other_user.username.0|upper }}
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900">
+                        Video Call with {% if user_role == 'patient' %}Dr. {% endif %}{{ other_user.get_full_name|default:other_user.username }}
+                    </h1>
+                    <p class="text-sm text-gray-600">
+                        Appointment: {{ appointment.date }} at {{ appointment.time|time:"g:i A" }}
+                    </p>
+                </div>
+            </div>
+            <div class="flex space-x-2">
+                <button id="end-call-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors">
+                    📞 End Call
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Call Interface -->
+    <div class="medical-card p-0 overflow-hidden">
+        <div class="relative bg-gray-900 h-96">
+            <!-- Remote Video (Other Person) -->
+            <video id="remote-video" class="w-full h-full object-cover" autoplay playsinline></video>
+            
+            <!-- Local Video (Self) - Picture in Picture -->
+            <div class="absolute top-4 right-4 w-48 h-36 bg-gray-800 rounded-lg overflow-hidden border-2 border-white">
+                <video id="local-video" class="w-full h-full object-cover" autoplay playsinline muted></video>
+            </div>
+            
+            <!-- Call Status -->
+            <div id="call-status" class="absolute top-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-lg">
+                Connecting...
+            </div>
+        </div>
+        
+        <!-- Call Controls -->
+        <div class="p-4 bg-gray-100 flex justify-center space-x-4">
+            <button id="toggle-video" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                📹 Video On
+            </button>
+            <button id="toggle-audio" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors">
+                🎤 Mic On
+            </button>
+            <button id="start-call" class="bg-medical-blue text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                📞 Start Call
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const appointmentId = {{ appointment.id }};
+    const currentUserId = {{ user.id }};
+    const otherUserId = {{ other_user.id }};
+    
+    let localStream = null;
+    let remoteStream = null;
+    let peerConnection = null;
+    let isVideoEnabled = true;
+    let isAudioEnabled = true;
+    
+    const localVideo = document.getElementById('local-video');
+    const remoteVideo = document.getElementById('remote-video');
+    const callStatus = document.getElementById('call-status');
+    
+    // WebRTC Configuration
+    const configuration = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+    };
+    
+    // Initialize media devices
+    async function initializeMedia() {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+            localVideo.srcObject = localStream;
+            callStatus.textContent = 'Ready to call';
+            
+            // Enable start call button
+            document.getElementById('start-call').disabled = false;
+        } catch (error) {
+            console.error('Error accessing media devices:', error);
+            callStatus.textContent = 'Camera/Microphone access denied';
+            alert('Please allow camera and microphone access to make video calls.');
+        }
+    }
+    
+    // Create peer connection
+    function createPeerConnection() {
+        peerConnection = new RTCPeerConnection(configuration);
+        
+        // Add local stream to peer connection
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+        }
+        
+        // Handle remote stream
+        peerConnection.ontrack = (event) => {
+            remoteStream = event.streams[0];
+            remoteVideo.srcObject = remoteStream;
+            callStatus.textContent = 'Connected';
+        };
+        
+        // Handle ICE candidates (simplified for demo)
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                console.log('ICE candidate:', event.candidate);
+                // In a real implementation, send this to the other peer via signaling server
+            }
+        };
+        
+        peerConnection.onconnectionstatechange = () => {
+            callStatus.textContent = `Connection: ${peerConnection.connectionState}`;
+        };
+    }
+    
+    // Start call
+    async function startCall() {
+        createPeerConnection();
+        
+        try {
+            // Create offer
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            
+            // Send offer to other peer via signaling
+            await fetch('/calls/signal/offer/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    appointment_id: appointmentId,
+                    offer: offer
+                })
+            });
+            
+            callStatus.textContent = 'Calling...';
+            
+            // Start polling for answer
+            pollForSignals();
+            
+        } catch (error) {
+            console.error('Error starting call:', error);
+            callStatus.textContent = 'Call failed';
+        }
+    }
+    
+    // Poll for WebRTC signals
+    async function pollForSignals() {
+        try {
+            const response = await fetch(`/calls/signal/${appointmentId}/`);
+            const data = await response.json();
+            
+            // Handle incoming offer
+            if (data.offer && !peerConnection.localDescription) {
+                await handleIncomingOffer(data.offer);
+            }
+            
+            // Handle incoming answer
+            if (data.answer && peerConnection.localDescription && !peerConnection.remoteDescription) {
+                await peerConnection.setRemoteDescription(data.answer);
+                callStatus.textContent = 'Connected';
+            }
+            
+            // Continue polling if call is active
+            if (peerConnection && peerConnection.connectionState !== 'closed') {
+                setTimeout(pollForSignals, 1000);
+            }
+            
+        } catch (error) {
+            console.error('Error polling for signals:', error);
+            setTimeout(pollForSignals, 2000);
+        }
+    }
+    
+    // Handle incoming offer
+    async function handleIncomingOffer(offer) {
+        createPeerConnection();
+        
+        try {
+            await peerConnection.setRemoteDescription(offer);
+            
+            // Create answer
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            
+            // Send answer back
+            await fetch('/calls/signal/answer/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    appointment_id: appointmentId,
+                    answer: answer
+                })
+            });
+            
+            callStatus.textContent = 'Answering call...';
+            
+        } catch (error) {
+            console.error('Error handling incoming offer:', error);
+        }
+    }
+    
+    // Toggle video
+    function toggleVideo() {
+        if (localStream) {
+            const videoTrack = localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                isVideoEnabled = videoTrack.enabled;
+                document.getElementById('toggle-video').textContent = 
+                    isVideoEnabled ? '📹 Video On' : '📹 Video Off';
+            }
+        }
+    }
+    
+    // Toggle audio
+    function toggleAudio() {
+        if (localStream) {
+            const audioTrack = localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                isAudioEnabled = audioTrack.enabled;
+                document.getElementById('toggle-audio').textContent = 
+                    isAudioEnabled ? '🎤 Mic On' : '🎤 Mic Off';
+            }
+        }
+    }
+    
+    // End call
+    function endCall() {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+        if (peerConnection) {
+            peerConnection.close();
+        }
+        
+        callStatus.textContent = 'Call ended';
+        
+        // Redirect back to chat
+        setTimeout(() => {
+            window.location.href = `/chat/${appointmentId}/`;
+        }, 2000);
+    }
+    
+    // Event listeners
+    document.getElementById('start-call').addEventListener('click', startCall);
+    document.getElementById('toggle-video').addEventListener('click', toggleVideo);
+    document.getElementById('toggle-audio').addEventListener('click', toggleAudio);
+    document.getElementById('end-call-btn').addEventListener('click', endCall);
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeMedia();
+        document.getElementById('start-call').disabled = true;
+        
+        // Start polling for incoming calls
+        setTimeout(pollForSignals, 2000);
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+    });
+</script>
+{% endblock %}

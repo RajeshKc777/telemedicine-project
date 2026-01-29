@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Availability - Telemedicine{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="medical-card p-6">
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">Manage Availability</h1>
+        <p class="text-gray-600">Set your available hours and days for appointments.</p>
+    </div>
+
+    <div class="medical-card p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Coming Soon</h2>
+        <p class="text-gray-600">Availability management features will be implemented in the next phase.</p>
+        
+        <div class="mt-6">
+            <a href="{% url 'dashboard_redirect' %}" 
+               class="bg-medical-blue text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Patients - Telemedicine{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-3xl font-bold text-gray-900">Patient Directory</h1>
+        <a href="{% url 'create_patient' %}" class="btn-medical">+ Add Patient</a>
+    </div>
+
+    <div class="medical-card overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DOB</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Blood Group</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for pat in patients %}
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">{{ pat.get_full_name|default:pat.username }}
+                        </div>
+                        <div class="text-sm text-gray-500">{{ pat.email }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {% if pat.patient_profile and pat.patient_profile.date_of_birth %}{{ pat.patient_profile.date_of_birth }}{% else %}--{% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {% if pat.patient_profile and pat.patient_profile.blood_group %}{{ pat.patient_profile.blood_group }}{% else %}--{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="px-6 py-8 text-center text-gray-500">No patients found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

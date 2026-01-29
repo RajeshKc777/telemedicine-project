@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}Patient Dashboard - Telemedicine{% endblock %}
+
+{% block content %}
+<div class="space-y-4 sm:space-y-6">
+
+    <!-- Welcome Header -->
+    <div class="medical-card p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Welcome, {{ user.first_name|default:user.username }}!</h1>
+                <p class="text-gray-600 mt-1 text-sm sm:text-base">Manage your appointments and health records</p>
+            </div>
+            <div class="medical-gradient w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-white">
+                <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upcoming Appointments -->
+    <div class="medical-card p-4 sm:p-6">
+        <h2 class="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">Upcoming Appointments</h2>
+        <div class="space-y-4">
+            {% if upcoming_appointments %}
+            {% for appt in upcoming_appointments %}
+            <div class="p-3 sm:p-4 bg-medical-bg rounded-xl">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 space-y-2 sm:space-y-0">
+                    <div class="flex-1">
+                        <p class="font-bold text-gray-900 text-sm sm:text-base">Dr. {{ appt.doctor.get_full_name|default:appt.doctor.username }}</p>
+                        <p class="text-xs sm:text-sm text-gray-500">{{ appt.date|date:"F d, Y" }} at {{ appt.time|time:"g:i A" }}</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="status-badge status-{{ appt.status }} capitalize">{{ appt.status }}</span>
+                        {% if appt.call_token %}
+                        <div class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
+                            Token: {{ appt.call_token }}
+                        </div>
+                        <a href="{% url 'enter_token' %}"
+                           class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">
+                            📹 Join Call
+                        </a>
+                        {% endif %}
+                        {% if appt.status in 'scheduled,rescheduled' %}
+                        <a href="{% url 'chat_room' appt.id %}" 
+                           class="bg-medical-blue text-white px-2 py-1 rounded text-xs hover:bg-blue-700">
+                            💬 Chat
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="border-t pt-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+                        <span class="text-xs sm:text-sm font-medium text-gray-600">Countdown:</span>
+                        <div class="countdown text-xs sm:text-sm font-medium text-medical-blue" 
+                             data-appointment-date="{{ appt.date|date:'Y-m-d' }}" 
+                             data-appointment-time="{{ appt.time|time:'H:i' }}">
+                            Calculating...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="text-center py-8 text-gray-500 text-sm sm:text-base">You have no upcoming appointments.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Available Doctors for Chat -->
+    {% if available_doctors %}
+    <div class="medical-card p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-6">Available Doctors for Chat</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for doctor in available_doctors %}
+            <div class="flex items-center justify-between p-4 bg-medical-bg rounded-xl">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-700">
+                        {{ doctor.first_name.0|default:doctor.username.0|upper }}
+                    </div>
+                    <div>
+                        <p class="font-bold text-gray-900">Dr. {{ doctor.get_full_name|default:doctor.username }}</p>
+                        <p class="text-sm text-gray-500">Doctor</p>
+                    </div>
+                </div>
+                <a href="{% url 'start_chat' doctor.id user.id %}" 
+                   class="bg-medical-blue text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    💬 Start Chat
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+function updateCountdowns() {
+    document.querySelectorAll('.countdown').forEach(function(element) {
+        const appointmentDate = element.getAttribute('data-appointment-date');
+        const appointmentTime = element.getAttribute('data-appointment-time');
+        const appointmentDateTime = new Date(appointmentDate + 'T' + appointmentTime);
+        const now = new Date();
+        const timeDiff = appointmentDateTime - now;
+        
+        if (timeDiff > 0) {
+            const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+            
+            if (days > 0) {
+                element.textContent = `${days} day${days > 1 ? 's' : ''}, ${hours} hour${hours > 1 ? 's' : ''}`;
+            } else if (hours > 0) {
+                element.textContent = `${hours} hour${hours > 1 ? 's' : ''}, ${minutes} minute${minutes > 1 ? 's' : ''}`;
+            } else if (minutes > 0) {
+                element.textContent = `${minutes} minute${minutes > 1 ? 's' : ''}`;
+            } else {
+                element.textContent = 'Starting soon!';
+                element.className = element.className.replace('text-medical-blue', 'text-green-600');
+            }
+        } else {
+            element.textContent = 'Expired';
+            element.className = element.className.replace('text-medical-blue', 'text-red-500');
+        }
+    });
+}
+
+// Update countdowns immediately and then every minute
+updateCountdowns();
+setInterval(updateCountdowns, 60000);
+</script>
+{% endblock %}

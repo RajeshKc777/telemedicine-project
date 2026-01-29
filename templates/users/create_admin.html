@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Hospital Admin - Telemedicine{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="medical-card p-8">
+        <div class="flex items-center space-x-4 mb-8">
+            <div class="medical-gradient w-12 h-12 rounded-lg flex items-center justify-center text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Create Hospital Admin</h1>
+                <p class="text-gray-600">Register a new administrative account for a hospital</p>
+            </div>
+        </div>
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Username</label>
+                    {{ form.username }}
+                    {% if form.username.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.username.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">First Name</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.first_name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Last Name</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.last_name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.email.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+                    {{ form.password }}
+                    {% if form.password.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.password.errors.0 }}</p>
+                    {% endif %}
+                    <p class="mt-1 text-xs text-gray-500">New admins can change their password after their first login.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end space-x-4 pt-6 border-t border-gray-100">
+                <a href="{% url 'manage_users' %}"
+                    class="px-6 py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors">Cancel</a>
+                <button type="submit" class="btn-medical">Create Admin Account</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

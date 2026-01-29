@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+
+{% block title %}Video Call Diagnostics{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="medical-card p-6">
+        <h1 class="text-2xl font-bold mb-4">Video Call System Diagnostics</h1>
+        
+        <!-- Connection Status -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h3 class="font-semibold mb-2">WebSocket Connection</h3>
+                <div id="websocket-status" class="text-red-500">Not Connected</div>
+                <button id="test-websocket" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm">Test Connection</button>
+            </div>
+            
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h3 class="font-semibold mb-2">Media Devices</h3>
+                <div id="media-status" class="text-red-500">Not Tested</div>
+                <button id="test-media" class="mt-2 bg-green-500 text-white px-3 py-1 rounded text-sm">Test Camera/Mic</button>
+            </div>
+        </div>
+
+        <!-- Test Videos -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="bg-gray-900 rounded-lg overflow-hidden">
+                <h4 class="text-white p-2 bg-gray-800">Local Video (Your Camera)</h4>
+                <video id="local-test-video" class="w-full h-48 object-cover" autoplay playsinline muted></video>
+            </div>
+            
+            <div class="bg-gray-900 rounded-lg overflow-hidden">
+                <h4 class="text-white p-2 bg-gray-800">Remote Video (Other User)</h4>
+                <video id="remote-test-video" class="w-full h-48 object-cover" autoplay playsinline></video>
+            </div>
+        </div>
+
+        <!-- WebRTC Test -->
+        <div class="bg-gray-50 p-4 rounded-lg mb-6">
+            <h3 class="font-semibold mb-2">WebRTC Peer Connection Test</h3>
+            <div id="webrtc-status" class="mb-2 text-gray-600">Ready to test</div>
+            <div class="space-x-2">
+                <button id="create-offer" class="bg-blue-500 text-white px-3 py-1 rounded text-sm">Create Offer</button>
+                <button id="create-answer" class="bg-green-500 text-white px-3 py-1 rounded text-sm" disabled>Create Answer</button>
+                <button id="test-ice" class="bg-purple-500 text-white px-3 py-1 rounded text-sm">Test ICE</button>
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="bg-black text-green-400 p-4 rounded-lg h-64 overflow-y-auto font-mono text-sm">
+            <div id="diagnostic-logs">Starting diagnostics...\n</div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="flex space-x-4 mt-4">
+            <button id="run-full-test" class="bg-medical-blue text-white px-6 py-2 rounded-lg">Run Full Test</button>
+            <button id="clear-logs" class="bg-gray-500 text-white px-6 py-2 rounded-lg">Clear Logs</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const appointmentId = {{ appointment.id }};
+    let testSocket = null;
+    let testPeerConnection = null;
+    let localTestStream = null;
+    
+    const logs = document.getElementById('diagnostic-logs');
+    const websocketStatus = document.getElementById('websocket-status');
+    const mediaStatus = document.getElementById('media-status');
+    const webrtcStatus = document.getElementById('webrtc-status');
+    
+    function log(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        logs.innerHTML += `[${timestamp}] ${message}\n`;
+        logs.scrollTop = logs.scrollHeight;
+    }
+    
+    // Test WebSocket Connection
+    function testWebSocket() {
+        log('Testing WebSocket connection...');
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        testSocket = new WebSocket(`${protocol}//${window.location.host}/ws/call/${appointmentId}/`);
+        
+        testSocket.onopen = function(e) {
+            log('✅ WebSocket connected successfully');
+            websocketStatus.textContent = 'Connected';
+            websocketStatus.className = 'text-green-500';
+        };
+        
+        testSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            log(`📨 Received: ${data.type}`);
+        };
+        
+        testSocket.onclose = function(e) {
+            log(`❌ WebSocket closed (code: ${e.code})`);
+            websocketStatus.textContent = 'Disconnected';
+            websocketStatus.className = 'text-red-500';
+        };
+        
+        testSocket.onerror = function(e) {
+            log('❌ WebSocket error occurred');
+            websocketStatus.textContent = 'Error';
+            websocketStatus.className = 'text-red-500';
+        };
+    }
+    
+    // Test Media Devices
+    async function testMediaDevices() {
+        log('Testing media devices...');
+        try {
+            localTestStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+            
+            document.getElementById('local-test-video').srcObject = localTestStream;
+            log('✅ Camera and microphone access granted');
+            mediaStatus.textContent = 'Working';
+            mediaStatus.className = 'text-green-500';
+            
+            // List available devices
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            const audioDevices = devices.filter(d => d.kind === 'audioinput');
+            
+            log(`📹 Video devices: ${videoDevices.length}`);
+            log(`🎤 Audio devices: ${audioDevices.length}`);
+            
+        } catch (error) {
+            log(`❌ Media access error: ${error.message}`);
+            mediaStatus.textContent = 'Failed';
+            mediaStatus.className = 'text-red-500';
+        }
+    }
+    
+    // Test WebRTC Peer Connection
+    function testWebRTC() {
+        log('Testing WebRTC peer connection...');
+        
+        const configuration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+        
+        testPeerConnection = new RTCPeerConnection(configuration);
+        
+        testPeerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                log(`🧊 ICE candidate: ${event.candidate.type}`);
+            }
+        };
+        
+        testPeerConnection.onconnectionstatechange = () => {
+            log(`🔗 Connection state: ${testPeerConnection.connectionState}`);
+            webrtcStatus.textContent = `Connection: ${testPeerConnection.connectionState}`;
+        };
+        
+        testPeerConnection.oniceconnectionstatechange = () => {
+            log(`❄️ ICE state: ${testPeerConnection.iceConnectionState}`);
+        };
+        
+        if (localTestStream) {
+            localTestStream.getTracks().forEach(track => {
+                testPeerConnection.addTrack(track, localTestStream);
+            });
+            log('✅ Local stream added to peer connection');
+        }
+    }
+    
+    // Create WebRTC Offer
+    async function createOffer() {
+        if (!testPeerConnection) {
+            testWebRTC();
+        }
+        
+        try {
+            const offer = await testPeerConnection.createOffer();
+            await testPeerConnection.setLocalDescription(offer);
+            log('✅ WebRTC offer created successfully');
+            log(`📄 Offer SDP length: ${offer.sdp.length} chars`);
+            
+            document.getElementById('create-answer').disabled = false;
+            
+            // Send via WebSocket if connected
+            if (testSocket && testSocket.readyState === WebSocket.OPEN) {
+                testSocket.send(JSON.stringify({
+                    type: 'offer',
+                    offer: offer
+                }));
+                log('📤 Offer sent via WebSocket');
+            }
+            
+        } catch (error) {
+            log(`❌ Error creating offer: ${error.message}`);
+        }
+    }
+    
+    // Create WebRTC Answer
+    async function createAnswer() {
+        try {
+            const answer = await testPeerConnection.createAnswer();
+            await testPeerConnection.setLocalDescription(answer);
+            log('✅ WebRTC answer created successfully');
+            log(`📄 Answer SDP length: ${answer.sdp.length} chars`);
+            
+        } catch (error) {
+            log(`❌ Error creating answer: ${error.message}`);
+        }
+    }
+    
+    // Test ICE Gathering
+    function testICE() {
+        log('Testing ICE candidate gathering...');
+        if (testPeerConnection) {
+            log(`🧊 ICE gathering state: ${testPeerConnection.iceGatheringState}`);
+        }
+    }
+    
+    // Run Full Test Suite
+    async function runFullTest() {
+        log('🚀 Starting full diagnostic test...');
+        
+        // Test 1: WebSocket
+        testWebSocket();
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Test 2: Media Devices
+        await testMediaDevices();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Test 3: WebRTC
+        testWebRTC();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Test 4: Create Offer
+        await createOffer();
+        
+        log('✅ Full diagnostic test completed');
+    }
+    
+    // Clear Logs
+    function clearLogs() {
+        logs.innerHTML = 'Logs cleared...\n';
+    }
+    
+    // Event Listeners
+    document.getElementById('test-websocket').addEventListener('click', testWebSocket);
+    document.getElementById('test-media').addEventListener('click', testMediaDevices);
+    document.getElementById('create-offer').addEventListener('click', createOffer);
+    document.getElementById('create-answer').addEventListener('click', createAnswer);
+    document.getElementById('test-ice').addEventListener('click', testICE);
+    document.getElementById('run-full-test').addEventListener('click', runFullTest);
+    document.getElementById('clear-logs').addEventListener('click', clearLogs);
+    
+    // Auto-start basic tests
+    document.addEventListener('DOMContentLoaded', () => {
+        log('Diagnostic page loaded');
+        log('Click "Run Full Test" to start comprehensive testing');
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (localTestStream) {
+            localTestStream.getTracks().forEach(track => track.stop());
+        }
+        if (testPeerConnection) {
+            testPeerConnection.close();
+        }
+        if (testSocket) {
+            testSocket.close();
+        }
+    });
+</script>
+{% endblock %}

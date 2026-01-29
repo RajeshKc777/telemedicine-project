@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - Telemedicine{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-3xl font-bold text-gray-900">{{ title }}</h1>
+        <a href="{% url 'dashboard_redirect' %}" class="text-medical-blue hover:text-medical-blue-dark">← Back to Dashboard</a>
+    </div>
+
+    {% if chat_partners %}
+    <!-- Search/Filter for Doctors -->
+    {% if user.role == 'doctor' %}
+    <div class="medical-card p-4 mb-6">
+        <div class="flex items-center space-x-4">
+            <div class="flex-1">
+                <input type="text" id="patient-search" 
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-blue focus:border-transparent"
+                       placeholder="Search patients by name...">
+            </div>
+            <div>
+                <select id="status-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-blue">
+                    <option value="all">All Status</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="rescheduled">Rescheduled</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="chat-partners-grid">
+        {% for partner in chat_partners %}
+        <div class="medical-card p-6 hover:shadow-lg transition-shadow chat-partner-card" 
+             data-name="{{ partner.user.get_full_name|default:partner.user.username|lower }}" 
+             data-status="{{ partner.appointment.status }}">
+            <div class="flex items-center space-x-4 mb-4">
+                <div class="w-12 h-12 bg-medical-blue rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    {{ partner.user.first_name.0|default:partner.user.username.0|upper }}
+                </div>
+                <div class="flex-1">
+                    <h3 class="font-bold text-gray-900 partner-name">
+                        {% if user.role == 'patient' %}Dr. {% endif %}{{ partner.user.get_full_name|default:partner.user.username }}
+                    </h3>
+                    <p class="text-sm text-gray-600">
+                        {% if user.role == 'doctor' %}Patient{% else %}Doctor{% endif %}
+                    </p>
+                </div>
+            </div>
+            
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                <p class="text-sm text-gray-600">Appointment:</p>
+                <p class="font-medium">{{ partner.appointment.date }} at {{ partner.appointment.time|time:"g:i A" }}</p>
+                <span class="inline-block mt-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 appointment-status">
+                    {{ partner.appointment.status|capfirst }}
+                </span>
+            </div>
+            
+            <a href="{% url 'chat_room' partner.appointment.id %}" 
+               class="w-full bg-medical-blue text-white py-2 px-4 rounded-lg hover:bg-medical-blue-dark transition-colors flex items-center justify-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.955 8.955 0 01-4.126-.98L3 20l1.98-5.874A8.955 8.955 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z"></path>
+                </svg>
+                <span>Start Chat</span>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="medical-card p-8 text-center text-gray-500">
+        <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.955 8.955 0 01-4.126-.98L3 20l1.98-5.874A8.955 8.955 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z"></path>
+        </svg>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No Chat Partners Available</h3>
+        <p class="text-gray-600">
+            {% if user.role == 'doctor' %}
+                You need scheduled appointments with patients to start chatting.
+            {% else %}
+                You need scheduled appointments with doctors to start chatting.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Search and filter functionality for doctors
+if (document.getElementById('patient-search')) {
+    const searchInput = document.getElementById('patient-search');
+    const statusFilter = document.getElementById('status-filter');
+    const partnerCards = document.querySelectorAll('.chat-partner-card');
+    
+    function filterPartners() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const statusFilter = document.getElementById('status-filter').value;
+        
+        partnerCards.forEach(card => {
+            const name = card.getAttribute('data-name');
+            const status = card.getAttribute('data-status');
+            
+            const matchesSearch = name.includes(searchTerm);
+            const matchesStatus = statusFilter === 'all' || status === statusFilter;
+            
+            if (matchesSearch && matchesStatus) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+        
+        // Show/hide no results message
+        const visibleCards = Array.from(partnerCards).filter(card => card.style.display !== 'none');
+        const grid = document.getElementById('chat-partners-grid');
+        let noResultsMsg = document.getElementById('no-results-msg');
+        
+        if (visibleCards.length === 0) {
+            if (!noResultsMsg) {
+                noResultsMsg = document.createElement('div');
+                noResultsMsg.id = 'no-results-msg';
+                noResultsMsg.className = 'col-span-full text-center py-8 text-gray-500';
+                noResultsMsg.innerHTML = '<p>No patients found matching your search.</p>';
+                grid.appendChild(noResultsMsg);
+            }
+        } else {
+            if (noResultsMsg) {
+                noResultsMsg.remove();
+            }
+        }
+    }
+    
+    searchInput.addEventListener('input', filterPartners);
+    statusFilter.addEventListener('change', filterPartners);
+}
+</script>
+{% endblock %}

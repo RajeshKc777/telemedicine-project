@@ -1,0 +1,4 @@
+AWS_PROFILE="Alone Walker"
+AWS_REGION="us-east-1"
+DEFANG_MODE="affordable"
+DEFANG_PROVIDER="aws"

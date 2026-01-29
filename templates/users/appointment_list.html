@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block title %}Appointments - Telemedicine{% endblock %}
+
+{% block content %}
+<div class="space-y-4 sm:space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Appointment Ledger</h1>
+        {% if user.role in 'admin,superadmin' %}
+        <a href="{% url 'create_appointment' %}" class="btn-medical flex items-center justify-center space-x-2 w-full sm:w-auto">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            <span>Schedule New</span>
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Mobile Card View -->
+    <div class="block sm:hidden space-y-4">
+        {% for appt in appointments %}
+        <div class="medical-card p-4">
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <div class="text-sm font-semibold text-gray-900">{{ appt.date|date:"M d, Y" }}</div>
+                    <div class="text-sm text-gray-500">{{ appt.time|time:"H:i" }}</div>
+                </div>
+                <span class="status-badge status-{{ appt.status }} capitalize text-xs">
+                    {{ appt.status }}
+                </span>
+            </div>
+            
+            <div class="space-y-2 mb-4">
+                <div class="text-sm">
+                    <span class="font-medium text-gray-600">Patient:</span>
+                    <span class="text-gray-900">{{ appt.patient.get_full_name|default:appt.patient.username }}</span>
+                </div>
+                <div class="text-sm">
+                    <span class="font-medium text-gray-600">Doctor:</span>
+                    <span class="text-gray-900">Dr. {{ appt.doctor.get_full_name|default:appt.doctor.username }}</span>
+                </div>
+            </div>
+            
+            {% if user.role in 'admin,superadmin' or user == appt.doctor or user == appt.patient %}
+            <div class="flex flex-wrap gap-2">
+                {% if appt.call_token %}
+                <div class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
+                    Token: {{ appt.call_token }}
+                </div>
+                <a href="{% url 'enter_token' %}"
+                   class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">
+                    📹 Join Call
+                </a>
+                {% endif %}
+                {% if user.role in 'admin,superadmin' %}
+                <a href="{% url 'edit_appointment' appt.id %}"
+                    class="text-indigo-600 hover:text-indigo-900 text-xs px-2 py-1 border border-indigo-200 rounded">Edit</a>
+                {% endif %}
+                {% if appt.status != 'cancelled' %}
+                <a href="{% url 'cancel_appointment' appt.id %}" class="text-red-600 hover:text-red-900 text-xs px-2 py-1 border border-red-200 rounded"
+                    onclick="return confirm('Are you sure you want to cancel this appointment?')">Cancel</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="medical-card p-8 text-center text-gray-500">
+            <p>No appointments found.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Desktop Table View -->
+    <div class="hidden sm:block medical-card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col"
+                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date &
+                            Time</th>
+                        <th scope="col"
+                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient
+                        </th>
+                        <th scope="col"
+                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor
+                        </th>
+                        <th scope="col"
+                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status
+                        </th>
+                        <th scope="col" class="relative px-4 py-3">
+                            <span class="sr-only">Actions</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for appt in appointments %}
+                    <tr>
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <div class="text-sm font-semibold text-gray-900">{{ appt.date|date:"M d, Y" }}</div>
+                            <div class="text-sm text-gray-500">{{ appt.time|time:"H:i" }}</div>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ appt.patient.get_full_name|default:appt.patient.username }}
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                            Dr. {{ appt.doctor.get_full_name|default:appt.doctor.username }}
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <span class="status-badge status-{{ appt.status }} capitalize">
+                                {{ appt.status }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            {% if user.role in 'admin,superadmin' or user == appt.doctor or user == appt.patient %}
+                            <div class="flex items-center justify-end space-x-2">
+                                {% if appt.call_token %}
+                                <div class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
+                                    Token: {{ appt.call_token }}
+                                </div>
+                                <a href="{% url 'enter_token' %}"
+                                   class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">
+                                    📹 Join Call
+                                </a>
+                                {% endif %}
+                                {% if user.role in 'admin,superadmin' %}
+                                <a href="{% url 'edit_appointment' appt.id %}"
+                                    class="text-indigo-600 hover:text-indigo-900">Edit</a>
+                                {% endif %}
+                                {% if appt.status != 'cancelled' %}
+                                <a href="{% url 'cancel_appointment' appt.id %}" class="text-red-600 hover:text-red-900"
+                                    onclick="return confirm('Are you sure you want to cancel this appointment?')">Cancel</a>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-gray-400">No actions</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-4 py-12 text-center text-gray-500">
+                            No appointments found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    {% if user.role == 'doctor' and completed_appointments %}
+    <!-- Completed Consultations Section -->
+    <div class="medical-card p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-6">Completed Consultations</h2>
+        <div class="space-y-4">
+            {% for appt in completed_appointments %}
+            <div class="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center font-bold text-green-700">
+                        {{ appt.date|date:"M d" }}
+                    </div>
+                    <div>
+                        <p class="font-bold text-gray-900">{{ appt.patient.get_full_name|default:appt.patient.username }}</p>
+                        <p class="text-sm text-gray-600">{{ appt.date }} at {{ appt.time|time:"g:i A" }}</p>
+                        {% if appt.consultation_notes %}
+                        <p class="text-sm text-gray-700 mt-1">{{ appt.consultation_notes|truncatewords:15 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <span class="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium">Completed</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% elif user.role == 'doctor' %}
+    <!-- No Completed Consultations -->
+    <div class="medical-card p-8 text-center text-gray-500">
+        <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <p class="text-lg">No completed consultations yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

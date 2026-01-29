@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}Appointment Requests - Telemedicine{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-3xl font-bold text-gray-900">Appointment Requests</h1>
+        <a href="{% url 'dashboard_redirect' %}" class="text-medical-blue hover:text-medical-blue-dark">← Back to Dashboard</a>
+    </div>
+
+    {% if requests %}
+    <div class="space-y-4">
+        {% for req in requests %}
+        <div class="medical-card p-6">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-4 mb-4">
+                        <div class="px-3 py-1 rounded-full text-sm font-medium
+                            {% if req.status == 'pending' %}bg-yellow-100 text-yellow-800
+                            {% elif req.status == 'approved' %}bg-green-100 text-green-800
+                            {% elif req.status == 'rejected' %}bg-red-100 text-red-800
+                            {% elif req.status == 'modified' %}bg-blue-100 text-blue-800
+                            {% endif %}">
+                            {{ req.status|capfirst }}
+                        </div>
+                        <span class="text-sm text-gray-500">{{ req.created_at|date:"M d, Y H:i" }}</span>
+                    </div>
+                    
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                        Patient: {{ req.patient.get_full_name|default:req.patient.username }}
+                    </h3>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <span class="text-sm text-gray-600">Requested Date:</span>
+                            <p class="font-medium">{{ req.requested_date }}</p>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-600">Requested Time:</span>
+                            <p class="font-medium">{{ req.requested_time }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <span class="text-sm text-gray-600">Message:</span>
+                        <p class="mt-1 text-gray-900">{{ req.message }}</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <span class="text-sm text-gray-600">Requested by:</span>
+                        <p class="font-medium">{{ req.requested_by.get_full_name|default:req.requested_by.username }} ({{ req.requested_by.hospital.name }})</p>
+                    </div>
+                </div>
+                
+                <div class="ml-6">
+                    {% if req.status == 'pending' %}
+                    <a href="{% url 'handle_request' req.id %}" class="btn-medical">
+                        Respond
+                    </a>
+                    {% else %}
+                    <span class="text-gray-500 text-sm">{{ req.status|capfirst }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="medical-card p-8 text-center text-gray-500">
+        <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+        <p class="text-lg">No appointment requests</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

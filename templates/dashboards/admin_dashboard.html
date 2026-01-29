@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard - Telemedicine{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Welcome Header -->
+    <div class="medical-card p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Hospital Administration</h1>
+                <p class="text-gray-600 mt-1">Managing operations for <span class="font-semibold text-medical-blue">{{ hospital.name }}</span></p>
+            </div>
+            <div class="medical-gradient w-16 h-16 rounded-full flex items-center justify-center">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
+                    </path>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hospital Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+
+        <div class="medical-card p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 font-medium">Total Doctors</p>
+                    <p class="text-3xl font-bold text-medical-blue mt-2">{{ doctors_count }}</p>
+                </div>
+                <div class="bg-blue-100 w-12 h-12 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-medical-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z">
+                        </path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="medical-card p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 font-medium">Total Patients</p>
+                    <p class="text-3xl font-bold text-medical-green mt-2">{{ patients_count }}</p>
+                </div>
+                <div class="bg-green-100 w-12 h-12 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-medical-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
+                        </path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="medical-card p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 font-medium">Appointments</p>
+                    <p class="text-3xl font-bold text-purple-600 mt-2">{{ appointments_count }}</p>
+                </div>
+                <div class="bg-purple-100 w-12 h-12 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                        </path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="medical-card p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 font-medium">Active Today</p>
+                    <p class="text-3xl font-bold text-yellow-500 mt-2">{{ active_today_count }}</p>
+                </div>
+                <div class="bg-yellow-100 w-12 h-12 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Management Sections -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Doctor Management -->
+        <div class="medical-card p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Doctor Management</h2>
+                <a href="{% url 'create_doctor' %}"
+                    class="text-sm text-medical-blue hover:text-medical-blue-dark font-medium">+ Add Doctor</a>
+            </div>
+            <div class="space-y-3">
+                <a href="{% url 'doctor_list' %}"
+                    class="w-full flex items-center justify-between p-3 bg-medical-bg hover:bg-gray-100 rounded-lg transition-colors">
+                    <div class="flex items-center space-x-3">
+                        <svg class="w-5 h-5 text-medical-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
+                            </path>
+                        </svg>
+                        <span class="font-medium text-gray-900">View All Doctors</span>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- Patient Management -->
+        <div class="medical-card p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Patient Management</h2>
+                <a href="{% url 'create_patient' %}"
+                    class="text-sm text-medical-blue hover:text-medical-blue-dark font-medium">+ Add Patient</a>
+            </div>
+            <div class="space-y-3">
+                <a href="{% url 'patient_list' %}"
+                    class="w-full flex items-center justify-between p-3 bg-medical-bg hover:bg-gray-100 rounded-lg transition-colors">
+                    <div class="flex items-center space-x-3">
+                        <svg class="w-5 h-5 text-medical-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
+                            </path>
+                        </svg>
+                        <span class="font-medium text-gray-900">View All Patients</span>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- Appointment Management -->
+        <div class="medical-card p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Appointment Management</h2>
+                <a href="{% url 'create_appointment' %}"
+                    class="text-sm text-medical-blue hover:text-medical-blue-dark font-medium">+ Schedule
+                    Appointment</a>
+            </div>
+            <div class="space-y-3">
+                <a href="{% url 'appointment_list' %}"
+                    class="w-full flex items-center justify-between p-3 bg-medical-bg hover:bg-gray-100 rounded-lg transition-colors">
+                    <div class="flex items-center space-x-3">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                            </path>
+                        </svg>
+                        <span class="font-medium text-gray-900">View All Appointments</span>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- Cross-Hospital Referrals -->
+        <div class="medical-card p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Cross-Hospital Referrals</h2>
+                <a href="{% url 'hospital_doctors' %}"
+                    class="text-sm text-medical-blue hover:text-medical-blue-dark font-medium">View Other Hospitals</a>
+            </div>
+            <div class="space-y-3">
+                <a href="{% url 'hospital_doctors' %}"
+                    class="w-full flex items-center justify-between p-3 bg-medical-bg hover:bg-gray-100 rounded-lg transition-colors">
+                    <div class="flex items-center space-x-3">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
+                            </path>
+                        </svg>
+                        <span class="font-medium text-gray-900">Refer to Other Hospitals</span>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

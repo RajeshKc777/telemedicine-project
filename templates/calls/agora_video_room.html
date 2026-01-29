@@ -1,0 +1,344 @@
+{% extends 'base.html' %}
+
+{% block title %}Video Call{% endblock %}
+
+{% block extra_css %}
+<style>
+    .video-container {
+        position: relative;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 10px;
+        width: 100%;
+    }
+    
+    .video-player {
+        width: 100%;
+        height: 200px;
+        background: #000;
+        object-fit: cover;
+    }
+    
+    @media (min-width: 640px) {
+        .video-player {
+            height: 300px;
+        }
+    }
+    
+    .username-wrapper {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    
+    .controls-wrapper {
+        text-align: center;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    @media (min-width: 640px) {
+        .controls-wrapper {
+            position: static;
+            transform: none;
+            padding: 20px;
+        }
+    }
+    
+    .control-icon {
+        width: 40px;
+        height: 40px;
+        margin: 0 8px;
+        padding: 8px;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid #ddd;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .control-icon:hover {
+        background: #f0f0f0;
+    }
+    
+    .control-icon.muted {
+        background: #dc3545;
+        border-color: #dc3545;
+        color: white;
+    }
+    
+    #video-streams {
+        min-height: 300px;
+        padding-bottom: 100px;
+    }
+    
+    @media (min-width: 640px) {
+        #video-streams {
+            min-height: 400px;
+            padding-bottom: 0;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3 px-2 sm:px-4">
+    <div class="bg-gray-100 p-3 sm:p-4 rounded-lg mb-4">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
+            <div>
+                <h5 class="text-sm sm:text-base font-semibold">Video Call - Token: {{ appointment.call_token }}</h5>
+                <p class="mb-0 text-xs sm:text-sm">{{ appointment.doctor.get_full_name|default:appointment.doctor.username }} & {{ appointment.patient.get_full_name|default:appointment.patient.username }}</p>
+            </div>
+            <div>
+                <span id="call-duration" class="inline-block px-2 py-1 bg-blue-500 text-white rounded text-xs sm:text-sm font-medium">00:00</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="w-full">
+        <div id="video-streams" class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+            <div class="w-full">
+                <div class="video-container">
+                    <div class="username-wrapper">
+                        <span>{{ user.get_full_name|default:user.username }} (You)</span>
+                    </div>
+                    <div id="local-video" class="video-player"></div>
+                </div>
+            </div>
+            <div class="w-full">
+                <div class="video-container">
+                    <div class="username-wrapper">
+                        <span id="remote-username">Waiting for other participant...</span>
+                    </div>
+                    <div id="remote-video" class="video-player bg-gray-800 flex items-center justify-center text-white text-sm">
+                        Remote Video
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="controls-wrapper">
+        <button id="mic-btn" class="control-icon" title="Toggle Microphone">
+            <i class="fas fa-microphone text-sm"></i>
+        </button>
+        <button id="camera-btn" class="control-icon" title="Toggle Camera">
+            <i class="fas fa-video text-sm"></i>
+        </button>
+        <button id="leave-btn" class="control-icon" title="Leave Call" style="background: #dc3545; color: white;">
+            <i class="fas fa-phone-slash text-sm"></i>
+        </button>
+    </div>
+</div>
+
+<script src="{% load static %}{% static 'assets/AgoraRTC_N-4.8.1.js' %}"></script>
+<script>
+// Agora configuration
+const APP_ID = 'efd7d3d435314591ac6738f65ad2d308';
+const CHANNEL = '{{ channel_name }}';
+const TOKEN = '{{ agora_token }}';
+
+let client;
+let localTracks = {
+    videoTrack: null,
+    audioTrack: null
+};
+let remoteUsers = {};
+let callStartTime = Date.now();
+let durationInterval;
+let micMuted = false;
+let cameraMuted = false;
+
+// Start call duration timer
+function startDurationTimer() {
+    durationInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById('call-duration').textContent = 
+            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }, 1000);
+}
+
+// Initialize Agora client
+async function initializeAgora() {
+    try {
+        // Create Agora client
+        client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+        
+        // Generate random UID
+        const uid = Math.floor(Math.random() * 100000);
+        
+        // Join channel
+        await client.join(APP_ID, CHANNEL, TOKEN, uid);
+        console.log('Joined channel successfully');
+        
+        // Create local tracks
+        localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
+        
+        // Play local video
+        localTracks.videoTrack.play('local-video');
+        
+        // Publish local tracks
+        await client.publish([localTracks.audioTrack, localTracks.videoTrack]);
+        console.log('Published local tracks');
+        
+        // Start timer
+        startDurationTimer();
+        
+        // Listen for remote users
+        client.on("user-published", handleUserPublished);
+        client.on("user-unpublished", handleUserUnpublished);
+        client.on("user-left", handleUserLeft);
+        
+    } catch (error) {
+        console.error('Error initializing Agora:', error);
+        alert('Error connecting to video call. Please try again.');
+    }
+}
+
+// Handle remote user published
+async function handleUserPublished(user, mediaType) {
+    console.log('User published:', user.uid, mediaType);
+    
+    // Subscribe to remote user
+    await client.subscribe(user, mediaType);
+    
+    if (mediaType === "video") {
+        // Play remote video
+        const remoteVideoContainer = document.getElementById('remote-video');
+        remoteVideoContainer.innerHTML = '';
+        user.videoTrack.play('remote-video');
+        
+        // Update username
+        const otherUser = '{{ appointment.doctor.get_full_name|default:appointment.doctor.username }}' === '{{ user.get_full_name|default:user.username }}' 
+            ? '{{ appointment.patient.get_full_name|default:appointment.patient.username }}'
+            : '{{ appointment.doctor.get_full_name|default:appointment.doctor.username }}';
+        document.getElementById('remote-username').textContent = otherUser;
+    }
+    
+    if (mediaType === "audio") {
+        user.audioTrack.play();
+    }
+    
+    remoteUsers[user.uid] = user;
+}
+
+// Handle remote user unpublished
+function handleUserUnpublished(user, mediaType) {
+    console.log('User unpublished:', user.uid, mediaType);
+    
+    if (mediaType === "video") {
+        const remoteVideoContainer = document.getElementById('remote-video');
+        remoteVideoContainer.innerHTML = '<div class="bg-gray-800 flex items-center justify-center text-white text-sm h-full">Remote Video</div>';
+        document.getElementById('remote-username').textContent = 'Waiting for other participant...';
+    }
+}
+
+// Handle remote user left
+function handleUserLeft(user) {
+    console.log('User left:', user.uid);
+    delete remoteUsers[user.uid];
+    
+    const remoteVideoContainer = document.getElementById('remote-video');
+    remoteVideoContainer.innerHTML = '<div class="bg-gray-800 flex items-center justify-center text-white text-sm h-full">Remote Video</div>';
+    document.getElementById('remote-username').textContent = 'Waiting for other participant...';
+}
+
+// Toggle microphone
+async function toggleMicrophone() {
+    if (!localTracks.audioTrack) return;
+    
+    micMuted = !micMuted;
+    await localTracks.audioTrack.setEnabled(!micMuted);
+    
+    const micBtn = document.getElementById('mic-btn');
+    if (micMuted) {
+        micBtn.classList.add('muted');
+        micBtn.innerHTML = '<i class="fas fa-microphone-slash text-sm"></i>';
+    } else {
+        micBtn.classList.remove('muted');
+        micBtn.innerHTML = '<i class="fas fa-microphone text-sm"></i>';
+    }
+}
+
+// Toggle camera
+async function toggleCamera() {
+    if (!localTracks.videoTrack) return;
+    
+    cameraMuted = !cameraMuted;
+    await localTracks.videoTrack.setEnabled(!cameraMuted);
+    
+    const cameraBtn = document.getElementById('camera-btn');
+    if (cameraMuted) {
+        cameraBtn.classList.add('muted');
+        cameraBtn.innerHTML = '<i class="fas fa-video-slash text-sm"></i>';
+    } else {
+        cameraBtn.classList.remove('muted');
+        cameraBtn.innerHTML = '<i class="fas fa-video text-sm"></i>';
+    }
+}
+
+// Leave call
+async function leaveCall() {
+    try {
+        // Stop local tracks
+        if (localTracks.audioTrack) {
+            localTracks.audioTrack.stop();
+            localTracks.audioTrack.close();
+        }
+        if (localTracks.videoTrack) {
+            localTracks.videoTrack.stop();
+            localTracks.videoTrack.close();
+        }
+        
+        // Leave channel
+        if (client) {
+            await client.leave();
+        }
+        
+        // Clear timer
+        if (durationInterval) {
+            clearInterval(durationInterval);
+        }
+        
+        // Redirect
+        window.location.href = '/';
+        
+    } catch (error) {
+        console.error('Error leaving call:', error);
+        window.location.href = '/';
+    }
+}
+
+// Event listeners
+document.getElementById('mic-btn').addEventListener('click', toggleMicrophone);
+document.getElementById('camera-btn').addEventListener('click', toggleCamera);
+document.getElementById('leave-btn').addEventListener('click', leaveCall);
+
+// Initialize on page load
+window.addEventListener('load', initializeAgora);
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', async () => {
+    await leaveCall();
+});
+</script>
+{% endblock %}

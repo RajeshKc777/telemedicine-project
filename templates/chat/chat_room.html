@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}Chat - {{ other_user.get_full_name|default:other_user.username }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Chat Header -->
+    <div class="medical-card p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-medical-blue rounded-full flex items-center justify-center text-white font-bold">
+                    {{ other_user.first_name.0|default:other_user.username.0|upper }}
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900">
+                        {% if user_role == 'patient' %}Dr. {% endif %}{{ other_user.get_full_name|default:other_user.username }}
+                    </h1>
+                    <p class="text-sm text-gray-600">
+                        Appointment: {{ appointment.date }} at {{ appointment.time|time:"g:i A" }}
+                    </p>
+                </div>
+            </div>
+            <div class="flex space-x-2">
+                <button class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors" disabled>
+                    📎 Attachment
+                </button>
+                <button class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors" disabled>
+                    📞 Audio Call
+                </button>
+                <button class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors" disabled>
+                    📹 Video Call
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Messages -->
+    <div class="medical-card p-0 overflow-hidden">
+        <div id="chat-messages" class="h-96 overflow-y-auto p-4 space-y-4">
+            {% for message in messages %}
+            <div class="flex {% if message.sender == user %}justify-end{% else %}justify-start{% endif %}">
+                <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg {% if message.sender == user %}bg-medical-blue text-white{% else %}bg-gray-200 text-gray-900{% endif %}">
+                    <p class="text-sm">{{ message.content }}</p>
+                    <p class="text-xs mt-1 {% if message.sender == user %}text-blue-100{% else %}text-gray-500{% endif %}">
+                        {{ message.timestamp|date:"H:i" }}
+                    </p>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center text-gray-500 py-8">
+                <p>No messages yet. Start the conversation!</p>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Message Input -->
+        <div class="border-t p-4">
+            <div class="flex space-x-4">
+                <input type="text" id="chat-message-input" 
+                       class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-blue focus:border-transparent"
+                       placeholder="Type your message..." maxlength="500">
+                <button id="chat-message-submit" 
+                        class="bg-medical-blue text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Send
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const appointmentId = {{ appointment.id }};
+    const currentUserId = {{ user.id }};
+    const chatSocket = new WebSocket(
+        (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + 
+        window.location.host + '/ws/chat/' + appointmentId + '/'
+    );
+
+    chatSocket.onopen = function(e) {
+        console.log('WebSocket connection opened');
+    };
+
+    chatSocket.onmessage = function(e) {
+        console.log('Message received:', e.data);
+        const data = JSON.parse(e.data);
+        const messagesContainer = document.querySelector('#chat-messages');
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `flex ${data.user_id == currentUserId ? 'justify-end' : 'justify-start'}`;
+        
+        messageDiv.innerHTML = `
+            <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${data.user_id == currentUserId ? 'bg-medical-blue text-white' : 'bg-gray-200 text-gray-900'}">
+                <p class="text-sm">${data.message}</p>
+                <p class="text-xs mt-1 ${data.user_id == currentUserId ? 'text-blue-100' : 'text-gray-500'}">
+                    ${new Date(data.timestamp).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'})}
+                </p>
+            </div>
+        `;
+        
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    };
+
+    chatSocket.onclose = function(e) {
+        console.error('Chat socket closed:', e.code, e.reason);
+        // Show connection error to user
+        const messagesContainer = document.querySelector('#chat-messages');
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'text-center text-red-500 py-2';
+        errorDiv.innerHTML = '<p>Connection lost. Please refresh the page.</p>';
+        messagesContainer.appendChild(errorDiv);
+    };
+
+    chatSocket.onerror = function(e) {
+        console.error('WebSocket error:', e);
+    };
+
+    document.querySelector('#chat-message-input').focus();
+    document.querySelector('#chat-message-input').onkeyup = function(e) {
+        if (e.keyCode === 13) {  // enter, return
+            document.querySelector('#chat-message-submit').click();
+        }
+    };
+
+    document.querySelector('#chat-message-submit').onclick = function(e) {
+        const messageInputDom = document.querySelector('#chat-message-input');
+        const message = messageInputDom.value.trim();
+        if (message && chatSocket.readyState === WebSocket.OPEN) {
+            console.log('Sending message:', message);
+            chatSocket.send(JSON.stringify({
+                'message': message
+            }));
+            messageInputDom.value = '';
+        } else if (chatSocket.readyState !== WebSocket.OPEN) {
+            alert('Connection not ready. Please wait or refresh the page.');
+        }
+    };
+
+    // Auto-scroll to bottom on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const messagesContainer = document.querySelector('#chat-messages');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    });
+</script>
+{% endblock %}
