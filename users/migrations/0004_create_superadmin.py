@@ -9,7 +9,8 @@ def create_superadmin(apps, schema_editor):
             email='admin@admin.com',
             password='admin123',
             first_name='Super',
-            last_name='Admin'
+            last_name='Admin',
+            role='superadmin'
         )
 
 def reverse_superadmin(apps, schema_editor):
