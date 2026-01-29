@@ -107,7 +107,7 @@ CHANNEL_LAYERS = {
 }
 
 # Database - Use Railway PostgreSQL or SQLite locally
-if any(os.environ.get(key) for key in ['DATABASE_URL', 'RAILWAY_ENVIRONMENT']):
+if os.environ.get('DATABASE_URL'):
     # Railway PostgreSQL database
     import dj_database_url
     DATABASES = {
