@@ -106,9 +106,9 @@ CHANNEL_LAYERS = {
     },
 }
 
-# Database - Use SQLite locally, PostgreSQL on Railway
-if os.environ.get('RAILWAY_ENVIRONMENT'):
-    # Production database (Railway with Supabase)
+# Database - Use environment variables if available, otherwise SQLite
+if any(os.environ.get(key) for key in ['DB_HOST', 'DATABASE_URL', 'RAILWAY_ENVIRONMENT']):
+    # Production database (Railway/Supabase)
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
