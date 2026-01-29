@@ -3,7 +3,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn telemedicine.wsgi:application --bind 0.0.0.0:$PORT",
+    "startCommand": "python manage.py makemigrations && python manage.py migrate && python manage.py collectstatic --noinput && gunicorn telemedicine.wsgi:application --bind 0.0.0.0:$PORT",
     "healthcheckPath": "/health/",
     "healthcheckTimeout": 100
   }
