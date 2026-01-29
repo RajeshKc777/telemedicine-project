@@ -159,7 +159,7 @@ def create_doctor(request):
             
             # Check if license number already exists
             from doctors.models import DoctorProfile
-            if DoctorProfile.objects.filter(license_number=license_number).exists():
+            if license_number and DoctorProfile.objects.filter(license_number=license_number).exists():
                 messages.error(request, 'A doctor with this license number already exists!')
                 return render(request, 'users/create_doctor.html')
             
