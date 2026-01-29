@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from users.views import dashboard_redirect
 from django.http import HttpResponse
+from db_test_views import test_db_connection
 
 def health_check(request):
     return HttpResponse("OK")
@@ -26,6 +27,7 @@ def health_check(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health_check'),
+    path('test-db/', test_db_connection, name='test_db_connection'),
 
     # Explicit auth endpoints
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
