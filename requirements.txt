@@ -8,3 +8,4 @@ pyOpenSSL
 cryptography
 gunicorn
 whitenoise
+psycopg2-binary

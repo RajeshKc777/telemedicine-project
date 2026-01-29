@@ -32,6 +32,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.defang.dev',
     'https://*.defang.io',
     'https://*.railway.app',
+    'https://*.supabase.co',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
 ]
@@ -109,8 +110,15 @@ CHANNEL_LAYERS = {
 # https://docs.djangoproject.com/en/stable/ref/settings/#databases
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'postgres',
+        'USER': 'postgres',
+        'PASSWORD': '301197997Mom@',
+        'HOST': 'db.qcaonoptsqlqopefomhm.supabase.co',
+        'PORT': '5432',
+        'OPTIONS': {
+            'sslmode': 'require',
+        },
     }
 }
 
