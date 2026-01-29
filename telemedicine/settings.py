@@ -106,21 +106,16 @@ CHANNEL_LAYERS = {
     },
 }
 
-# Database - Use environment variables if available, otherwise SQLite
-if any(os.environ.get(key) for key in ['DB_HOST', 'DATABASE_URL', 'RAILWAY_ENVIRONMENT']):
-    # Production database (Railway/Supabase)
+# Database - Use Railway PostgreSQL or SQLite locally
+if any(os.environ.get(key) for key in ['DATABASE_URL', 'RAILWAY_ENVIRONMENT']):
+    # Railway PostgreSQL database
+    import dj_database_url
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get('DB_NAME', 'postgres'),
-            'USER': os.environ.get('DB_USER', 'postgres'),
-            'PASSWORD': os.environ.get('DB_PASSWORD'),
-            'HOST': os.environ.get('DB_HOST'),
-            'PORT': os.environ.get('DB_PORT', '5432'),
-            'OPTIONS': {
-                'sslmode': 'require',
-            },
-        }
+        'default': dj_database_url.config(
+            default=os.environ.get('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
 else:
     # Local development database (SQLite)
