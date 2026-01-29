@@ -19,10 +19,18 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from users.views import dashboard_redirect
 from django.http import HttpResponse
-from db_test_views import test_db_connection
 
 def health_check(request):
     return HttpResponse("OK")
+
+def test_db_connection(request):
+    from django.db import connection
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        return HttpResponse("Database connection successful")
+    except Exception as e:
+        return HttpResponse(f"Database connection failed: {e}")
 
 urlpatterns = [
     path('admin/', admin.site.urls),

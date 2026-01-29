@@ -337,6 +337,11 @@ def manual_test(request, appointment_id):
     """Manual test view for appointment-based calls"""
     appointment = get_object_or_404(Appointment, id=appointment_id)
     
+    # Check if user has access
+    if request.user != appointment.doctor and request.user != appointment.patient:
+        messages.error(request, "You don't have access to this test.")
+        return redirect('dashboard_redirect')
+    
     context = {
         'appointment': appointment,
     }
@@ -357,63 +362,6 @@ def cross_device_test(request, appointment_id):
 @login_required
 def get_signal(request, appointment_id):
     """Get WebRTC signaling data"""
-    if request.method == 'GET':
-        signal_type = request.GET.get('type')  # 'offer' or 'answer'
-        other_user_id = request.GET.get('other_user_id')
-        
-        if signal_type == 'offer':
-            cache_key = f'webrtc_offer_{appointment_id}_{other_user_id}'
-        else:
-            cache_key = f'webrtc_answer_{appointment_id}_{other_user_id}'
-        
-        signal_data = cache.get(cache_key)
-        
-        if signal_data:
-            cache.delete(cache_key)  # Remove after retrieving
-            return JsonResponse({'success': True, 'data': signal_data})
-        else:
-            return JsonResponse({'success': False, 'message': 'No signal data found'})
-    
-    return JsonResponse({'success': False, 'error': 'Invalid request method'})cts.get(id=appointment_id)
-            if request.user == appointment.doctor or request.user == appointment.patient:
-                results['access'] = True
-            else:
-                results['errors'].append('Access denied')
-                
-        except Appointment.DoesNotExist:
-            results['errors'].append('Appointment not found')
-            
-        return JsonResponse(results)
-    
-@login_required
-def manual_test(request, appointment_id):
-    appointment = get_object_or_404(Appointment, id=appointment_id)
-    
-    # Check if user has access
-    if request.user != appointment.doctor and request.user != appointment.patient:
-        messages.error(request, "You don't have access to this test.")
-        return redirect('dashboard_redirect')
-    
-    context = {
-        'appointment': appointment,
-    }
-    
-@login_required
-def cross_device_test(request, appointment_id):
-    appointment = get_object_or_404(Appointment, id=appointment_id)
-    
-    # Check if user has access
-    if request.user != appointment.doctor and request.user != appointment.patient:
-        messages.error(request, "You don't have access to this test.")
-        return redirect('dashboard_redirect')
-    
-    context = {
-        'appointment': appointment,
-    }
-    
-    return render(request, 'calls/cross_device_test.html', context)
-@login_required
-def get_signal(request, appointment_id):
     appointment = get_object_or_404(Appointment, id=appointment_id)
     
     # Check access
